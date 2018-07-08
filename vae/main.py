@@ -42,10 +42,6 @@ class VAE(nn.Module):
         return self.decode(z), mu, logvar
 
 
-model = VAE().to(device)
-optimizer = optim.Adam(model.parameters(), lr=1e-3)
-
-
 # Reconstruction + KL divergence losses summed over all elements and batch
 def loss_function(recon_x, x, mu, logvar):
     BCE = F.binary_cross_entropy(recon_x, x.view(-1, 784), size_average=False)
@@ -63,7 +59,7 @@ def train(epoch, train_loader):
     model.train()
     train_loss = 0
     for batch_idx, (data, _) in enumerate(train_loader):
-        data = data.to(device)
+        data = data.to(args.device)
         optimizer.zero_grad()
         recon_batch, mu, logvar = model(data)
         loss = loss_function(recon_batch, data, mu, logvar)
@@ -85,7 +81,7 @@ def test(epoch, test_loader):
     test_loss = 0
     with torch.no_grad():
         for i, (data, _) in enumerate(test_loader):
-            data = data.to(device)
+            data = data.to(args.device)
             recon_batch, mu, logvar = model(data)
             test_loss += loss_function(recon_batch, data, mu, logvar).item()
             if i == 0:
@@ -100,9 +96,9 @@ def test(epoch, test_loader):
 
 
 def mnist_test(args):
-    torch.manual_seed(args.seed)
 
-    device = torch.device("cuda" if args.cuda else "cpu")
+    model = VAE().to(args.device)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
     kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
     train_loader = torch.utils.data.DataLoader(
@@ -118,7 +114,7 @@ def mnist_test(args):
         train(epoch, train_loader)
         test(epoch, test_loader)
         with torch.no_grad():
-            sample = torch.randn(64, 20).to(device)
+            sample = torch.randn(64, 20).to(args.device)
             sample = model.decode(sample).cpu()
             save_image(sample.view(64, 1, 28, 28),
                        'results/sample_' + str(epoch) + '.png')
@@ -139,4 +135,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args.cuda = not args.no_cuda and torch.cuda.is_available()
 
-    test_mnist(args)
+    torch.manual_seed(args.seed)
+    device = torch.device("cuda" if args.cuda else "cpu")
+
+    mnist_test(args)
